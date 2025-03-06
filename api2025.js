@@ -63,59 +63,67 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
 } catch (exception) { 
 }
 }
+// Objeto para armazenar chamadas de API na sessão
+const apiCallsCollection = {};
+let apiCallIndex = 1; // Índice para identificar a ordem das chamadas AJAX
 
-(function() {
-    var originalFetch = window.fetch;
-    window.fetch = function() {
-        let startTime = performance.now();
-        return originalFetch.apply(this, arguments).then(response => {
-            let endTime = performance.now();
-            let clonedResponse = response.clone();
+// Substituir o XMLHttpRequest para interceptar chamadas AJAX
+const originalXHROpen = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function(method, url) {
+    this._url = url;
+    this._method = method;
+    return originalXHROpen.apply(this, arguments);
+};
 
-            clonedResponse.text().then(body => {
-                window.DXA.sendTrackedEvent({
-                    eventName: "API Request",
-                    eventDetails: {
-                        url: response.url,
-                        method: "GET",
-                        responseTime: endTime - startTime,
-                        statusCode: response.status,
-                        responsePayload: body
-                    }
-                });
-            });
+const originalXHRSend = XMLHttpRequest.prototype.send;
+XMLHttpRequest.prototype.send = function(body) {
+    const callId = `AJAX Call ${apiCallIndex++}`; // Define um identificador único
+    const startTime = Date.now(); // Marca o início da requisição
 
-            return response;
+    this.addEventListener("load", function() {
+        const responseTime = Date.now() - startTime; // Calcula o tempo de resposta
+
+        const requestData = {
+            method: this._method,
+            url: this._url,
+            requestPayload: body || null,
+            timestamp: new Date().toISOString()
+        };
+
+        const responseData = {
+            statusCode: this.status,
+            statusText: this.statusText,
+            responsePayload: this.responseText,
+            responseTime: responseTime
+        };
+
+        // Estrutura do evento para a chamada atual
+        apiCallsCollection[callId] = {
+            eventName: `AJAX Request - ${this.status}`,
+            requestData,
+            responseData
+        };
+
+        // Enviar evento para o DXA
+        window.DXA.sendTrackedEvent({
+            eventName: `AJAX Request - ${this.status}`,
+            eventDetails: {
+                url: this._url,
+                method: requestData.method,
+                statusCode: responseData.statusCode,
+                statusText: responseData.statusText,
+                responseTime: responseData.responseTime,
+                requestPayload: requestData.requestPayload,
+                responsePayload: responseData.responsePayload
+            }
         });
-    };
 
-    var originalXHROpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url) {
-        this._url = url;
-        this._method = method;
-        return originalXHROpen.apply(this, arguments);
-    };
+        console.log(`DXA Tracked Event Enviado - AJAX Request: ${this.status} ${this._url}`);
+    });
 
-    var originalXHRSend = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.send = function(body) {
-        var startTime = performance.now();
-        this.addEventListener("load", function() {
-            var endTime = performance.now();
-            window.DXA.sendTrackedEvent({
-                eventName: "xhr_request",
-                eventDetails: {
-                    url: this._url,
-                    method: this._method,
-                    statusCode: this.status,
-                    responseTime: endTime - startTime,
-                    requestPayload: body,
-                    responsePayload: this.responseText
-                }
-            });
-        });
-        return originalXHRSend.apply(this, arguments);
-    };
-})();
+    return originalXHRSend.apply(this, arguments);
+};
+		
 // Call back function call by DF
 window.dxa_digital_integration = function(eventType, detail) {    
 try {
