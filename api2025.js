@@ -63,11 +63,7 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
 } catch (exception) { 
 }
 }
-// Objeto para armazenar chamadas de API na sessão
-const apiCallsCollection = {};
-let apiCallIndex = 1; // Índice para identificar a ordem das chamadas AJAX
-
-// Substituir o XMLHttpRequest para interceptar chamadas AJAX
+// Substituir XMLHttpRequest para interceptar chamadas AJAX
 const originalXHROpen = XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open = function(method, url) {
     this._url = url;
@@ -77,7 +73,6 @@ XMLHttpRequest.prototype.open = function(method, url) {
 
 const originalXHRSend = XMLHttpRequest.prototype.send;
 XMLHttpRequest.prototype.send = function(body) {
-    const callId = `AJAX Call ${apiCallIndex++}`; // Define um identificador único
     const startTime = Date.now(); // Marca o início da requisição
 
     this.addEventListener("load", function() {
@@ -97,28 +92,25 @@ XMLHttpRequest.prototype.send = function(body) {
             responseTime: responseTime
         };
 
-        // Estrutura do evento para a chamada atual
-        apiCallsCollection[callId] = {
-            eventName: `AJAX Request - ${this.status}`,
-            requestData,
-            responseData
-        };
+        // Enviar evento individual para o DXA com apenas os detalhes da requisição atual
+        if (typeof decibelInsight !== "undefined") {
+            decibelInsight("sendTrackedEvent", {
+                eventName: `AJAX Request - ${this.status}`,
+                eventDetails: {
+                    url: requestData.url,
+                    method: requestData.method,
+                    statusCode: responseData.statusCode,
+                    statusText: responseData.statusText,
+                    responseTime: responseData.responseTime,
+                    requestPayload: requestData.requestPayload,
+                    responsePayload: responseData.responsePayload
+                }
+            });
 
-        // Enviar evento para o DXA
-        window.DXA.sendTrackedEvent({
-            eventName: `AJAX Request - ${this.status}`,
-            eventDetails: {
-                url: this._url,
-                method: requestData.method,
-                statusCode: responseData.statusCode,
-                statusText: responseData.statusText,
-                responseTime: responseData.responseTime,
-                requestPayload: requestData.requestPayload,
-                responsePayload: responseData.responsePayload
-            }
-        });
-
-        console.log(`DXA Tracked Event Enviado - AJAX Request: ${this.status} ${this._url}`);
+            console.log(`DXA Tracked Event Enviado - AJAX Request: ${this.status} ${this._url}`);
+        } else {
+            console.warn("decibelInsight não está definido. O evento não foi enviado.");
+        }
     });
 
     return originalXHRSend.apply(this, arguments);
