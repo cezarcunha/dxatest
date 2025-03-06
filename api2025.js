@@ -63,58 +63,6 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
 } catch (exception) { 
 }
 }
-// Substituir XMLHttpRequest para interceptar chamadas AJAX
-const originalXHROpen = XMLHttpRequest.prototype.open;
-XMLHttpRequest.prototype.open = function(method, url) {
-    this._url = url;
-    this._method = method;
-    return originalXHROpen.apply(this, arguments);
-};
-
-const originalXHRSend = XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.send = function(body) {
-    const startTime = Date.now(); // Marca o início da requisição
-
-    this.addEventListener("load", function() {
-        const responseTime = Date.now() - startTime; // Calcula o tempo de resposta
-
-        const requestData = {
-            method: this._method,
-            url: this._url,
-            requestPayload: body || null,
-            timestamp: new Date().toISOString()
-        };
-
-        const responseData = {
-            statusCode: this.status,
-            statusText: this.statusText,
-            responsePayload: this.responseText,
-            responseTime: responseTime
-        };
-
-        // Enviar evento individual para o DXA com apenas os detalhes da requisição atual
-        if (typeof decibelInsight !== "undefined") {
-            decibelInsight("sendTrackedEvent", {
-                eventName: `AJAX Request - ${this.status}`,
-                eventDetails: {
-                    url: requestData.url,
-                    method: requestData.method,
-                    statusCode: responseData.statusCode,
-                    statusText: responseData.statusText,
-                    responseTime: responseData.responseTime,
-                    requestPayload: requestData.requestPayload,
-                    responsePayload: responseData.responsePayload
-                }
-            });
-
-            console.log(`DXA Tracked Event Enviado - AJAX Request: ${this.status} ${this._url}`);
-        } else {
-            console.warn("decibelInsight não está definido. O evento não foi enviado.");
-        }
-    });
-
-    return originalXHRSend.apply(this, arguments);
-};
 		
 // Call back function call by DF
 window.dxa_digital_integration = function(eventType, detail) {    
@@ -154,6 +102,67 @@ dxa_digital_integration(mdEvent.type, mdEvent.detail);
 }}catch(e){window[window.DecibelInsight].warn('DecibelInsight: Configuration error in Integration Tag.', e.toString()); if (window[window.DecibelInsight].handleException) window[window.DecibelInsight].handleException('Integration', e, 'CONFIG');}try{(function(){if(window.decibelInsight&&window.gtag){
 
 }
+// Objeto para armazenar todas as chamadas de API na sessão
+const apiCallsCollection = {};
+let apiCallIndex = 1; // Índice para identificar a ordem de cada chamada de API
+
+// Substituir XMLHttpRequest para interceptar chamadas AJAX
+const originalXHROpen = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function(method, url) {
+    this._url = url;
+    this._method = method;
+    return originalXHROpen.apply(this, arguments);
+};
+
+const originalXHRSend = XMLHttpRequest.prototype.send;
+XMLHttpRequest.prototype.send = function(body) {
+    const callId = `AJAX Call ${apiCallIndex++}`; // Define um identificador único
+    const startTime = Date.now(); // Marca o início da requisição
+
+    this.addEventListener("load", function() {
+        const responseTime = Date.now() - startTime; // Calcula o tempo de resposta
+
+        const requestData = {
+            method: this._method,
+            url: this._url,
+            requestPayload: body || null,
+            timestamp: new Date().toISOString()
+        };
+
+        const responseData = {
+            statusCode: this.status,
+            statusText: this.statusText,
+            responsePayload: this.responseText,
+            responseTime: responseTime
+        };
+
+        // Estrutura do evento para a chamada atual
+        apiCallsCollection[callId] = {
+            eventName: `AJAX Request - ${this.status}`,
+            requestData,
+            responseData
+        };
+
+        // Enviar o evento para o DXA (mantendo a estrutura original)
+        if (typeof decibelInsight !== "undefined") {
+            decibelInsight("sendTrackedEvent", `AJAX Request - ${this.status}`, {
+                url: requestData.url,
+                method: requestData.method,
+                statusCode: responseData.statusCode,
+                statusText: responseData.statusText,
+                responseTime: responseData.responseTime,
+                requestPayload: requestData.requestPayload,
+                responsePayload: responseData.responsePayload
+            });
+
+            console.log(`DXA Tracked Event Enviado - AJAX Request: ${this.status} ${this._url}`);
+        } else {
+            console.warn("decibelInsight não está definido. O evento não foi enviado.");
+        }
+    });
+
+    return originalXHRSend.apply(this, arguments);
+};
 var b=0,
 alreadyTracked = (((window._da_.int_state || '').indexOf('ga4:1') !== -1) || (window.sessionStorage && +window.sessionStorage.di_ga4_tracked === 1)),
 a=function(){
