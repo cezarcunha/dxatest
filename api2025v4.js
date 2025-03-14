@@ -94,7 +94,7 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
                 let statusCode = xhr.status;
 
                 // Envia evento para o DXA
-                decibelInsight("sendTrackedEvent", `${statusCode} - API`);
+                decibelInsight("sendTrackedEvent", `${statusCode} - ${requestUrl}`);
             }
         });
 
@@ -116,7 +116,7 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
                 const statusCode = response.status;
 
                 // Envia evento para o DXA apenas se for API relevante
-                decibelInsight("sendTrackedEvent", `${statusCode} - API`);
+                decibelInsight("sendTrackedEvent", `${statusCode} - ${requestUrl}`);
 
                 return response;
             });
