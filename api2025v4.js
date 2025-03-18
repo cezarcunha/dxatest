@@ -64,42 +64,59 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
 }
 }
 (function() {
-    // Lista de padrões de URL para capturar apenas APIs relevantes
-    const apiRegexList = [
-        /\/api\//,            // URLs que contêm "/api/"
-        /\/v\d+\/endpoint/,   // URLs do tipo "/v1/endpoint", "/v2/..."
-        /\/services\/.*/,     // URLs que começam com "/services/"
-        /\/graphql/,          // GraphQL APIs
-        /^https:\/\/api\.meusite\.com/,  // APIs específicas do domínio
-    ];
-
-    // Função para verificar se uma URL deve ser capturada
-    function isRelevantAPI(url) {
-        return apiRegexList.some(regex => regex.test(url));
-    }
-
-    // Interceptando XMLHttpRequest
-    const originalXHR = window.XMLHttpRequest;
-    window.XMLHttpRequest = function() {
-        const xhr = new originalXHR();
-        let requestUrl = '';
-
-        xhr.open = function(method, url, async, user, password) {
-            requestUrl = url;
-            return originalXHR.prototype.open.apply(this, arguments);
-        };
-
-        xhr.addEventListener("readystatechange", function() {
-            if (xhr.readyState === 4 && isRelevantAPI(requestUrl)) { // Apenas APIs filtradas
-                let statusCode = xhr.status;
-
-                // Envia evento para o DXA
-                decibelInsight("sendTrackedEvent", `${statusCode} - ${requestUrl}`);
-            }
-        });
-
-        return xhr;
-    };
+   // Lista de padrões de URL para capturar apenas APIs relevantes
+   var apiRegexList = [
+       /\/api\//,            // URLs que contêm "/api/"
+       /\/v\d+\/endpoint/,   // URLs do tipo "/v1/endpoint", "/v2/..."
+       /\/services\/.*/,     // URLs que começam com "/services/"
+       /\/graphql/,          // GraphQL APIs
+       /^https:\/\/api\.meusite\.com/  // APIs específicas do domínio
+   ];
+   // Função para verificar se uma URL deve ser capturada
+   function isRelevantAPI(url) {
+       for (var i = 0; i < apiRegexList.length; i++) {
+           if (apiRegexList[i].test(url)) {
+               return true;
+           }
+       }
+       return false;
+   }
+   // Interceptando XMLHttpRequest
+   var originalXHR = window.XMLHttpRequest;
+   window.XMLHttpRequest = function() {
+       var xhr = new originalXHR();
+       var requestUrl = '';
+       var originalOpen = xhr.open;
+       xhr.open = function(method, url, async, user, password) {
+           requestUrl = url;
+           return originalOpen.apply(this, arguments);
+       };
+       xhr.addEventListener("readystatechange", function() {
+           if (xhr.readyState === 4 && isRelevantAPI(requestUrl)) { // Apenas APIs filtradas
+               var statusCode = xhr.status;
+               // Envia evento para o DXA
+               decibelInsight("sendTrackedEvent", statusCode + " - " + requestUrl);
+           }
+       });
+       return xhr;
+   };
+   // Interceptando Fetch API
+   var originalFetch = window.fetch;
+   window.fetch = function(input, init) {
+       var requestUrl = (typeof input === 'string') ? input : input.url;
+       // Verifica se a URL é de uma API relevante
+       if (!isRelevantAPI(requestUrl)) {
+           return originalFetch(input, init);
+       }
+       return originalFetch(input, init)
+           .then(function(response) {
+               var statusCode = response.status;
+               // Envia evento para o DXA apenas se for API relevante
+               decibelInsight("sendTrackedEvent", statusCode + " - " + requestUrl);
+               return response;
+           });
+   };
+})();
 
     // Interceptando Fetch API
     const originalFetch = window.fetch;
