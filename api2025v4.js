@@ -78,7 +78,6 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
                 if (shouldCaptureAPI(this.responseURL)) {
                     var logMessage = this.status + " - " + this.responseURL;
                     decibelInsight("sendTrackedEvent", logMessage);
-                    console.log("✅ API Capturada: " + logMessage);
                 }
             });
 
@@ -86,7 +85,6 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
                 if (shouldCaptureAPI(this.responseURL)) {
                     var logMessage = "Erro - " + this.responseURL;
                     decibelInsight("sendTrackedEvent", logMessage);
-                    console.log("❌ Erro na API Capturada: " + logMessage);
                 }
             });
 
@@ -103,7 +101,6 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
                     if (shouldCaptureAPI(response.url)) {
                         var logMessage = response.status + " - " + response.url;
                         decibelInsight("sendTrackedEvent", logMessage);
-                        console.log("✅ API Capturada: " + logMessage);
                     }
                     return response; // Retorna a resposta original sem modificações
                 })
@@ -111,15 +108,13 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
                     if (shouldCaptureAPI(url)) {
                         var logMessage = "Erro - " + url;
                         decibelInsight("sendTrackedEvent", logMessage);
-                        console.log("❌ Erro na API Capturada: " + logMessage);
                     }
                     throw error; // Mantém o comportamento original do erro
                 });
         };
     })();
-
-    console.log("🔍 Monitoramento de APIs ativado.");
 })();
+
 
 
 // Call back function call by DF
