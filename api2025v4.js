@@ -2,7 +2,7 @@
  * Copyright 2025 Medallia Inc.
  * https://www.medallia.com/
  */
-window._da_=window._da_||[];_da_['jsVersion']=1738239582;_da_["da_websiteId"] = 2487866;_da_["returnVisit"] = false;_da_["accountNumber"] = 14201;_da_["da_dnsRecord"] = "collection.decibelinsight.net";_da_["intPreScripts"] = function(){};_da_["intScripts"] = function(){try{// List of events which need to check at DXA level
+window._da_=window._da_||[];_da_['jsVersion']=1742398955;_da_["da_websiteId"] = 2487866;_da_["returnVisit"] = false;_da_["accountNumber"] = 14201;_da_["da_dnsRecord"] = "collection.decibelinsight.net";_da_["intPreScripts"] = function(){};_da_["intScripts"] = function(){try{// List of events which need to check at DXA level
 var medalliaEventsArr = ["MDigital_Form_Close_No_Submit","MDigital_Form_Next_Page","MDigital_Form_Back_Page","MDigital_ThankYou_Close","MDigital_Form_Close_Submitted","MDigital_ThankYou_Displayed","MDigital_Submit_Feedback","MDigital_CaptureButton_Taken","MDigital_Invite_Declined","MDigital_Feedback_Button_Clicked","MDigital_Form_Displayed"];
 var medalliaEventConfig = "surveyEngagement";
 
@@ -63,88 +63,65 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
 } catch (exception) { 
 }
 }
-(function() {
-    var apiRegexList = [
-        /\/api\//,            // APIs padrão
-        /\/v\d+\/endpoint/,   // APIs com versão
-        /\/services\/.*/,     // Serviços internos
-        /\/graphql/,          // GraphQL
-        /^https:\/\/api\.meusite\.com/  // Domínio específico da API
-    ];
 
-    function isRelevantAPI(url) {
-        return apiRegexList.some(regex => regex.test(url));
+(function() {
+    function shouldCaptureAPI(url) {
+        var excludedApis = /(\S*\/ge-to-know-away-Golgots-now-Macb-I-get-lye-feart)|(\S*\/j\/collect)|(\S*\/analytics)/;
+        return !excludedApis.test(url);
     }
 
-    var originalXHR = window.XMLHttpRequest;
-    var originalFetch = window.fetch;
+    // Escuta eventos de `XMLHttpRequest`
+    (function() {
+        var send = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.send = function() {
+            this.addEventListener('load', function() {
+                if (shouldCaptureAPI(this.responseURL)) {
+                    var logMessage = this.status + " - " + this.responseURL;
+                    decibelInsight("sendTrackedEvent", logMessage);
+                    console.log("✅ API Capturada: " + logMessage);
+                }
+            });
 
-    // Interceptando XMLHttpRequest, mas garantindo que scripts e assets não sejam afetados
-    window.XMLHttpRequest = function() {
-        var xhr = new originalXHR();
-        var requestUrl = '';
+            this.addEventListener('error', function() {
+                if (shouldCaptureAPI(this.responseURL)) {
+                    var logMessage = "Erro - " + this.responseURL;
+                    decibelInsight("sendTrackedEvent", logMessage);
+                    console.log("❌ Erro na API Capturada: " + logMessage);
+                }
+            });
 
-        var originalOpen = xhr.open;
-        xhr.open = function(method, url, async, user, password) {
-            requestUrl = url;
-            return originalOpen.apply(this, arguments);
+            return send.apply(this, arguments); // Executa o comportamento original
         };
+    })();
 
-        xhr.addEventListener("readystatechange", function() {
-            if (xhr.readyState === 4 && isRelevantAPI(requestUrl)) {
-                var statusCode = xhr.status;
-                if (typeof decibelInsight === "function") {
-                    decibelInsight("sendTrackedEvent", statusCode + " - " + requestUrl);
-                }
-            }
-        });
+    // Escuta eventos de `fetch`
+    (function() {
+        var originalFetch = window.fetch;
+        window.fetch = function(url, options) {
+            return originalFetch.apply(this, arguments)
+                .then(function(response) {
+                    if (shouldCaptureAPI(response.url)) {
+                        var logMessage = response.status + " - " + response.url;
+                        decibelInsight("sendTrackedEvent", logMessage);
+                        console.log("✅ API Capturada: " + logMessage);
+                    }
+                    return response; // Retorna a resposta original sem modificações
+                })
+                .catch(function(error) {
+                    if (shouldCaptureAPI(url)) {
+                        var logMessage = "Erro - " + url;
+                        decibelInsight("sendTrackedEvent", logMessage);
+                        console.log("❌ Erro na API Capturada: " + logMessage);
+                    }
+                    throw error; // Mantém o comportamento original do erro
+                });
+        };
+    })();
 
-        return xhr;
-    };
-
-    // Interceptando Fetch API, mas garantindo que scripts e assets não sejam afetados
-    window.fetch = function(input, init) {
-        var requestUrl = (typeof input === 'string') ? input : input.url;
-
-        if (!isRelevantAPI(requestUrl)) {
-            return originalFetch(input, init);
-        }
-
-        return originalFetch(input, init)
-            .then(function(response) {
-                var statusCode = response.status;
-                if (typeof decibelInsight === "function") {
-                    decibelInsight("sendTrackedEvent", statusCode + " - " + requestUrl);
-                }
-                return response;
-            });
-    };
+    console.log("🔍 Monitoramento de APIs ativado.");
 })();
 
 
-    // Interceptando Fetch API
-    const originalFetch = window.fetch;
-    window.fetch = function(input, init) {
-        const requestUrl = (typeof input === 'string') ? input : input.url;
-
-        // Verifica se a URL é de uma API relevante
-        if (!isRelevantAPI(requestUrl)) {
-            return originalFetch(input, init);
-        }
-
-        return originalFetch(input, init)
-            .then(response => {
-                const statusCode = response.status;
-
-                // Envia evento para o DXA apenas se for API relevante
-                decibelInsight("sendTrackedEvent", `${statusCode} - ${requestUrl}`);
-
-                return response;
-            });
-    };
-})();
-
-		
 // Call back function call by DF
 window.dxa_digital_integration = function(eventType, detail) {    
 try {
