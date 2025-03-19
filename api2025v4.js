@@ -64,35 +64,30 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
 }
 }
 (function() {
-    // Lista de padrões de URL para capturar apenas APIs relevantes
     var apiRegexList = [
-        /\/api\//,            // URLs que contêm "/api/"
-        /\/v\d+\/endpoint/,   // URLs do tipo "/v1/endpoint", "/v2/..."
-        /\/services\/.*/,     // URLs que começam com "/services/"
-        /\/graphql/,          // GraphQL APIs
-        /^https:\/\/api\.meusite\.com/  // APIs específicas do domínio
+        /\/api\//,            // APIs padrão
+        /\/v\d+\/endpoint/,   // APIs com versão
+        /\/services\/.*/,     // Serviços internos
+        /\/graphql/,          // GraphQL
+        /^https:\/\/api\.meusite\.com/  // Domínio específico da API
     ];
 
-    // Função para verificar se uma URL deve ser capturada
     function isRelevantAPI(url) {
-        for (var i = 0; i < apiRegexList.length; i++) {
-            if (apiRegexList[i].test(url)) {
-                return true;
-            }
-        }
-        return false;
+        return apiRegexList.some(regex => regex.test(url));
     }
 
-    // Interceptando XMLHttpRequest
     var originalXHR = window.XMLHttpRequest;
-    function CustomXHR() {
+    var originalFetch = window.fetch;
+
+    // Interceptando XMLHttpRequest, mas garantindo que scripts e assets não sejam afetados
+    window.XMLHttpRequest = function() {
         var xhr = new originalXHR();
         var requestUrl = '';
-        var originalOpen = xhr.open;
 
+        var originalOpen = xhr.open;
         xhr.open = function(method, url, async, user, password) {
             requestUrl = url;
-            return originalOpen.apply(xhr, arguments);
+            return originalOpen.apply(this, arguments);
         };
 
         xhr.addEventListener("readystatechange", function() {
@@ -105,19 +100,17 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
         });
 
         return xhr;
-    }
-    window.XMLHttpRequest = CustomXHR;
+    };
 
-    // Interceptando Fetch API
-    var originalFetch = window.fetch;
+    // Interceptando Fetch API, mas garantindo que scripts e assets não sejam afetados
     window.fetch = function(input, init) {
         var requestUrl = (typeof input === 'string') ? input : input.url;
 
         if (!isRelevantAPI(requestUrl)) {
-            return originalFetch.call(window, input, init);
+            return originalFetch(input, init);
         }
 
-        return originalFetch.call(window, input, init)
+        return originalFetch(input, init)
             .then(function(response) {
                 var statusCode = response.status;
                 if (typeof decibelInsight === "function") {
@@ -127,6 +120,7 @@ decibelInsight("sendIntegrationData", "Medallia", m_ContextData);
             });
     };
 })();
+
 
     // Interceptando Fetch API
     const originalFetch = window.fetch;
